@@ -1,6 +1,6 @@
-/* 🏠 Lead Gurus - Leadshook JSON Script v1.8
+/* 🏠 Lead Gurus - Leadshook JSON Script v1.9
    - Reads from 'Offers' tab via Google Visualization JSON API
-   - Works inside Leadshook sandbox (no CORS / download issues)
+   - Works in Leadshook (no CORS / no download)
    - Auto seasonal labeling + LookupKey matching
 */
 
@@ -10,18 +10,12 @@
   const AUTHOR = "Lead Gurus";
   const FALLBACK_MESSAGE = "💰 Save Thousands for a Limited Time";
 
-  // ✅ JSON endpoint (use your spreadsheet ID + tab name)
+  // ✅ JSON feed from your public sheet
   const jsonUrl =
     "https://docs.google.com/spreadsheets/d/1rwgtCjN_wXnJs77dF-djv-72kAHyXiI072ffXIZ8uSk/gviz/tq?tqx=out:json&sheet=Offers";
 
-  // --- Helper functions ------------------------------------------------------
   const normalize = (str) =>
-    str?.toString()
-      .normalize("NFD")
-      .replace(/[\u00A0]/g, " ")
-      .replace(/\s+/g, "")
-      .trim()
-      .toLowerCase();
+    str?.toString().normalize("NFD").replace(/[\u00A0]/g, " ").replace(/\s+/g, "").trim().toLowerCase();
 
   const showError = (msg) => {
     const el = document.getElementById("promo-header");
@@ -29,42 +23,13 @@
     console.warn(msg);
   };
 
-  // --- Render header ---------------------------------------------------------
   function renderHeader(v, offer, color, author, customPromo = "", isFallback = false) {
     const h = document.getElementById("promo-header");
-    if (!h) return showError("❌ promo-header element not found");
+    if (!h) return showError("❌ promo-header not found");
 
     const now = new Date();
     const y = now.getFullYear();
-    const promos = getPromos(y, v);
-    let active = promos.find((p) => new Date(p.start) <= now && now <= new Date(p.end));
-    if (!active) active = promos[promos.length - 1];
-
-    Object.assign(h.style, {
-      backgroundColor: color,
-      color: "#fff",
-      textAlign: "center",
-      fontSize: "18px",
-      fontWeight: "bold",
-      padding: "10px 8px",
-      lineHeight: "1.3",
-      overflowWrap: "break-word",
-      whiteSpace: "normal",
-    });
-
-    const label = customPromo
-      ? customPromo + ": "
-      : active && active.name
-      ? active.name + ": "
-      : "";
-
-    h.textContent =
-      isFallback || !offer ? FALLBACK_MESSAGE : `${label}${offer}`;
-  }
-
-  // --- Seasonal promos -------------------------------------------------------
-  function getPromos(y, v) {
-    return [
+    const promos = [
       { name: `🎉 New Year ${v} Refresh`, start: `${y}-01-01`, end: `${y}-01-07` },
       { name: `❄️ Winter ${v} Upgrade`, start: `${y}-01-08`, end: `${y}-01-31` },
       { name: `💘 Sweetheart ${v} Sale`, start: `${y}-02-01`, end: `${y}-02-13` },
@@ -80,9 +45,25 @@
       { name: `🎄 Holiday Savings Sale`, start: `${y}-12-01`, end: `${y}-12-15` },
       { name: `🎆 Year-End Sale`, start: `${y}-12-25`, end: `${y}-12-31` },
     ];
+
+    let active = promos.find((p) => new Date(p.start) <= now && now <= new Date(p.end));
+    if (!active) active = promos[promos.length - 1];
+
+    Object.assign(h.style, {
+      backgroundColor: color,
+      color: "#fff",
+      textAlign: "center",
+      fontSize: "18px",
+      fontWeight: "bold",
+      padding: "10px 8px",
+      lineHeight: "1.3",
+    });
+
+    const label = customPromo ? customPromo + ": " : active.name + ": ";
+    h.textContent =
+      isFallback || !offer ? FALLBACK_MESSAGE : `${label}${offer}`;
   }
 
-  // --- Load & parse data -----------------------------------------------------
   async function loadOffer(c, v, retries = 0) {
     try {
       const res = await fetch(jsonUrl);
@@ -91,8 +72,7 @@
       const rows = json.table.rows.map((r) => r.c.map((c) => (c ? c.v : "")));
 
       const lookupKey = normalize(c + v);
-      const dataRows = rows.slice(1);
-      const m = dataRows.find((r) => normalize(r[6]) === lookupKey);
+      const m = rows.find((r) => normalize(r[6]) === lookupKey);
 
       const offer = m ? m[2] : FALLBACK_MESSAGE,
         color = m ? m[3] || "#f93536" : "#f93536",
@@ -111,7 +91,6 @@
     }
   }
 
-  // --- Wait for Leadshook DOM -----------------------------------------------
   function waitUntilReady() {
     const headerEl = document.getElementById("promo-header");
     if (headerEl) loadOffer(CLIENT_NAME, VERTICAL);
