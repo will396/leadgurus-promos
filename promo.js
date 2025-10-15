@@ -1,7 +1,8 @@
-/* 🏠 Lead Gurus - Leadshook JSON Script v1.9
-   - Reads from 'Offers' tab via Google Visualization JSON API
-   - Works in Leadshook (no CORS / no download)
-   - Auto seasonal labeling + LookupKey matching
+/* 🏠 Lead Gurus - Cloudflare Worker Edition v2.0
+   - Fetches live offers via your Cloudflare proxy
+   - Fully Leadshook-compatible (no CORS or sandbox issues)
+   - Uses LookupKey column for matching
+   - Auto seasonal labeling
 */
 
 (function () {
@@ -10,12 +11,16 @@
   const AUTHOR = "Lead Gurus";
   const FALLBACK_MESSAGE = "💰 Save Thousands for a Limited Time";
 
-  // ✅ JSON feed from your public sheet
-  const jsonUrl =
-    "https://docs.google.com/spreadsheets/d/1rwgtCjN_wXnJs77dF-djv-72kAHyXiI072ffXIZ8uSk/gviz/tq?tqx=out:json&sheet=Offers";
+  // ✅ Your Cloudflare Worker URL (this fetches the JSON from Google Sheets)
+  const jsonUrl = "https://black-snow-0bd8.will-070.workers.dev/";
 
   const normalize = (str) =>
-    str?.toString().normalize("NFD").replace(/[\u00A0]/g, " ").replace(/\s+/g, "").trim().toLowerCase();
+    str?.toString()
+      .normalize("NFD")
+      .replace(/[\u00A0]/g, " ")
+      .replace(/\s+/g, "")
+      .trim()
+      .toLowerCase();
 
   const showError = (msg) => {
     const el = document.getElementById("promo-header");
@@ -57,6 +62,8 @@
       fontWeight: "bold",
       padding: "10px 8px",
       lineHeight: "1.3",
+      overflowWrap: "break-word",
+      whiteSpace: "normal",
     });
 
     const label = customPromo ? customPromo + ": " : active.name + ": ";
@@ -68,7 +75,7 @@
     try {
       const res = await fetch(jsonUrl);
       const text = await res.text();
-      const json = JSON.parse(text.substring(47, text.length - 2));
+      const json = JSON.parse(text.substring(47, text.length - 2)); // Google visualization JSON cleanup
       const rows = json.table.rows.map((r) => r.c.map((c) => (c ? c.v : "")));
 
       const lookupKey = normalize(c + v);
