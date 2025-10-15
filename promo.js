@@ -1,9 +1,9 @@
-/* 🏠 Lead Gurus - Global Promo Script (CSV Edition v1.3)
-   - Pulls data from published Google Sheet (CSV)
-   - Fully Leadshook-compatible (no CORS / API key)
-   - Uses LookupKey for dynamic matching
+/* 🏠 Lead Gurus - Global Promo Script (Leadshook-Proof CSV Edition v1.5)
+   - Reads from published Google Sheet (CSV feed)
+   - No API key or CORS issues
    - Auto seasonal labeling
-   - DOM-safe
+   - LookupKey matching
+   - DOM-safe and retry-ready
 */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -14,33 +14,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const AUTHOR = "Lead Gurus";
   const FALLBACK_MESSAGE = "💰 Save Thousands for a Limited Time";
 
-  // ✅ Your live published CSV feed
+  // ✅ Live published CSV feed (your new sheet)
   const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQi0b-DlbldAqnDEQ8KGSN_FW2NujnC43ePOHCfFuLCkKc0TKlJ9vHVZkRlZ676QOASvsW8ZnFBvkI3/pub?gid=1583681302&single=true&output=csv";
 
-  // 🔧 Normalize helper
-  function normalize(str) {
-    return str?.toString()
+  // --- Helper functions ---
+  const normalize = str => str?.toString()
       .normalize("NFD")
       .replace(/[\u00A0]/g, " ")
       .replace(/\s+/g, "")
       .trim()
       .toLowerCase();
-  }
 
-  // 🧠 Load and parse CSV data
+  const showError = msg => {
+    const el = document.getElementById("promo-header");
+    if (el) el.textContent = msg;
+    else console.warn(msg);
+  };
+
+  // --- Core logic ---
   async function loadOffer(c, v) {
     try {
       const res = await fetch(csvUrl);
+      if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
       const text = await res.text();
       const rows = text.split("\n").map(r =>
         r.split(",").map(cell => cell.replace(/^"|"$/g, "").trim())
       );
 
       const lookupKey = normalize(c + v);
-      const headers = rows[0];
       const dataRows = rows.slice(1);
-
-      // Find the right row
       const m = dataRows.find(r => normalize(r[6]) === lookupKey);
 
       const offer = m ? m[2] : FALLBACK_MESSAGE,
@@ -50,26 +52,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       renderHeader(v, offer, color, author, customPromo);
     } catch (e) {
-      console.warn("Sheet fetch error → fallback:", e);
+      showError(`⚠️ Offer load error: ${e.message}`);
       renderHeader(VERTICAL, FALLBACK_MESSAGE, "#f93536", AUTHOR, "", true);
     }
   }
 
-  // 🖼️ Render header
+  // --- Rendering ---
   function renderHeader(v, offer, color, author, customPromo = "", isFallback = false) {
+    const h = document.getElementById("promo-header");
+    if (!h) return showError("❌ #promo-header element missing");
+
     const now = new Date();
     const y = now.getFullYear();
     const promos = getPromos(y, v);
-
     let active = promos.find(p => new Date(p.start) <= now && now <= new Date(p.end));
-    if (!active) {
-      active = promos.findLast
-        ? promos.findLast(p => new Date(p.start) < now)
-        : promos[promos.length - 1];
-    }
-
-    const h = document.getElementById("promo-header");
-    if (!h) return;
+    if (!active) active = promos[promos.length - 1];
 
     Object.assign(h.style, {
       backgroundColor: color,
@@ -80,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       padding: "10px 8px",
       lineHeight: "1.3",
       overflowWrap: "break-word",
-      whiteSpace: "normal",
+      whiteSpace: "normal"
     });
 
     const label = customPromo
@@ -89,13 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
         ? active.name + ": "
         : "";
 
-    h.textContent =
-      isFallback || offer === FALLBACK_MESSAGE
-        ? FALLBACK_MESSAGE
-        : `${label}${offer}`;
+    h.textContent = isFallback || offer === FALLBACK_MESSAGE
+      ? FALLBACK_MESSAGE
+      : `${label}${offer}`;
   }
 
-  // 🎉 Universal seasonal promos
+  // --- Seasonal promotions ---
   function getPromos(y, v) {
     return [
       { name: `🎉 New Year ${v} Refresh`, start: `${y}-01-01`, end: `${y}-01-07` },
@@ -117,10 +113,10 @@ document.addEventListener("DOMContentLoaded", () => {
       { name: "🖤 Black Friday Sale", start: `${y}-11-25`, end: `${y}-11-30` },
       { name: "🎄 Holiday Savings Sale", start: `${y}-12-01`, end: `${y}-12-15` },
       { name: "🎅 Christmas Sale", start: `${y}-12-16`, end: `${y}-12-24` },
-      { name: "🎆 Year-End Sale", start: `${y}-12-25`, end: `${y}-12-31` },
+      { name: "🎆 Year-End Sale", start: `${y}-12-25`, end: `${y}-12-31` }
     ];
   }
 
   // 🚀 Launch
-  loadOffer(CLIENT_NAME, VERTICAL);
+  setTimeout(() => loadOffer(CLIENT_NAME, VERTICAL), 500);
 });
