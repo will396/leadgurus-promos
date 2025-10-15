@@ -1,9 +1,9 @@
-/* 🏠 Lead Gurus - Global Promo Script (Rollout-Safe v1.2)
-   - Reads from Offers-New tab during transition
-   - Uses LookupKey column for reliable matching
-   - Works for all clients & verticals automatically
+/* 🏠 Lead Gurus - Global Promo Script (CSV Edition v1.3)
+   - Pulls data from published Google Sheet (CSV)
+   - Fully Leadshook-compatible (no CORS / API key)
+   - Uses LookupKey for dynamic matching
    - Auto seasonal labeling
-   - DOM-safe (fixes 'Loading Offer' on mobile)
+   - DOM-safe
 */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -12,11 +12,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const CLIENT_NAME = s.getAttribute("data-client");
   const VERTICAL = s.getAttribute("data-vertical");
   const AUTHOR = "Lead Gurus";
-  const SHEET_ID = "1rwgtCjN_wXnJs77dF-djv-72kAHyXiI072ffXIZ8uSk";
-  const API_KEY = "AIzaSyCKH_5CVN47E_tE-flYHDDyKLPVGtjNEGQ";
   const FALLBACK_MESSAGE = "💰 Save Thousands for a Limited Time";
 
-  // 🔧 Normalize text for case & spacing
+  // ✅ Your live published CSV feed
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQi0b-DlbldAqnDEQ8KGSN_FW2NujnC43ePOHCfFuLCkKc0TKlJ9vHVZkRlZ676QOASvsW8ZnFBvkI3/pub?gid=1583681302&single=true&output=csv";
+
+  // 🔧 Normalize helper
   function normalize(str) {
     return str?.toString()
       .normalize("NFD")
@@ -26,40 +27,40 @@ document.addEventListener("DOMContentLoaded", () => {
       .toLowerCase();
   }
 
-  // 🧠 Fetch offer from Offers-New tab
+  // 🧠 Load and parse CSV data
   async function loadOffer(c, v) {
     try {
-      const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/'Offers-New'!A2:H500?key=${API_KEY}&t=${Date.now()}`
+      const res = await fetch(csvUrl);
+      const text = await res.text();
+      const rows = text.split("\n").map(r =>
+        r.split(",").map(cell => cell.replace(/^"|"$/g, "").trim())
       );
-      const d = await res.json();
-      if (!d.values) throw new Error("No data returned");
 
-      const rows = d.values;
       const lookupKey = normalize(c + v);
+      const headers = rows[0];
+      const dataRows = rows.slice(1);
 
-      // ✅ Match by LookupKey column (G = index 6)
-      const m = rows.find(r => normalize(r[6]) === lookupKey);
+      // Find the right row
+      const m = dataRows.find(r => normalize(r[6]) === lookupKey);
 
       const offer = m ? m[2] : FALLBACK_MESSAGE,
             color = m ? m[3] || "#f93536" : "#f93536",
             author = m ? m[4] || AUTHOR : AUTHOR,
-            customPromo = m && m[7] ? m[7] : ""; // Optional custom promo override (column H)
+            customPromo = m && m[7] ? m[7] : "";
 
       renderHeader(v, offer, color, author, customPromo);
     } catch (e) {
-      console.warn("Sheet error → fallback:", e);
+      console.warn("Sheet fetch error → fallback:", e);
       renderHeader(VERTICAL, FALLBACK_MESSAGE, "#f93536", AUTHOR, "", true);
     }
   }
 
-  // 🖼️ Display the promo banner
+  // 🖼️ Render header
   function renderHeader(v, offer, color, author, customPromo = "", isFallback = false) {
     const now = new Date();
     const y = now.getFullYear();
     const promos = getPromos(y, v);
 
-    // ✅ Choose current or most recent promo
     let active = promos.find(p => new Date(p.start) <= now && now <= new Date(p.end));
     if (!active) {
       active = promos.findLast
@@ -94,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
         : `${label}${offer}`;
   }
 
-  // 🎉 Universal seasonal promos (auto-applies to all verticals)
+  // 🎉 Universal seasonal promos
   function getPromos(y, v) {
     return [
       { name: `🎉 New Year ${v} Refresh`, start: `${y}-01-01`, end: `${y}-01-07` },
@@ -122,5 +123,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 🚀 Launch
   loadOffer(CLIENT_NAME, VERTICAL);
-
 });
